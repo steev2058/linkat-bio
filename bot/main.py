@@ -4,7 +4,7 @@ from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command, CommandObject
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
-from aiogram.types import Message
+from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 from dotenv import load_dotenv
 import os
 import re
@@ -70,24 +70,106 @@ def me(message: Message):
     return user, page
 
 
+def main_menu_kb():
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="🚀 إنشاء الصفحة"), KeyboardButton(text="📤 نشر")],
+            [KeyboardButton(text="🔗 الروابط"), KeyboardButton(text="📊 الإحصائيات")],
+            [KeyboardButton(text="💳 خطتي"), KeyboardButton(text="✏️ تعديل سريع")],
+        ],
+        resize_keyboard=True,
+    )
+
+
+def quick_choice_kb(labels: list[str]):
+    return ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text=l)] for l in labels],
+        resize_keyboard=True,
+        one_time_keyboard=True,
+    )
+
+
+def is_done_text(text: str) -> bool:
+    return (text or "").strip().lower() in {"/done", "done", "تم", "خلص", "انتهيت"}
+
+
+def is_skip_text(text: str) -> bool:
+    return (text or "").strip().lower() in {"/skip", "skip", "تخطي", "تجاوز"}
+
+
+def infer_title_from_url(url: str) -> tuple[str, str]:
+    u = (url or "").lower()
+    if "instagram.com" in u:
+        return "Instagram", "instagram"
+    if "youtube.com" in u or "youtu.be" in u:
+        return "YouTube", "youtube"
+    if "tiktok.com" in u:
+        return "TikTok", "tiktok"
+    if "snapchat.com" in u:
+        return "Snapchat", "snapchat"
+    if "facebook.com" in u:
+        return "Facebook", "facebook"
+    if "wa.me" in u or "whatsapp" in u:
+        return "WhatsApp", "whatsapp"
+    if "t.me" in u or "telegram" in u:
+        return "Telegram", "telegram"
+    return "Website", "website"
+
+
 @dp.message(Command("start"))
 async def start(m: Message):
     me(m)
-    await m.answer(WELCOME_TEXT)
+    await m.answer(WELCOME_TEXT, reply_markup=main_menu_kb())
 
 
 @dp.message(Command("help"))
 async def help_cmd(m: Message):
     await m.answer(
-        "الأوامر: /create /edit /links /publish /stats /plan /redeem CODE /post /bio /lang"
+        "الأوامر: /create /edit /links /publish /stats /plan /redeem CODE /post /bio /lang",
+        reply_markup=main_menu_kb(),
     )
+
+
+@dp.message(Command("menu"))
+async def menu_cmd(m: Message):
+    await m.answer("اختر الإجراء", reply_markup=main_menu_kb())
+
+
+@dp.message(F.text == "🚀 إنشاء الصفحة")
+async def menu_to_create(m: Message, state: FSMContext):
+    await create_start(m, state)
+
+
+@dp.message(F.text == "📤 نشر")
+async def menu_to_publish(m: Message):
+    await publish_cmd(m)
+
+
+@dp.message(F.text == "🔗 الروابط")
+async def menu_to_links(m: Message, state: FSMContext):
+    await links_cmd(m, state)
+
+
+@dp.message(F.text == "📊 الإحصائيات")
+async def menu_to_stats(m: Message):
+    await stats_cmd(m)
+
+
+@dp.message(F.text == "💳 خطتي")
+async def menu_to_plan(m: Message):
+    await plan_cmd(m)
+
+
+@dp.message(F.text == "✏️ تعديل سريع")
+async def menu_to_edit(m: Message):
+    await edit_cmd(m)
 
 
 @dp.message(Command("create"))
 async def create_start(m: Message, state: FSMContext):
     me(m)
     await state.set_state(CreateWizard.name)
-    await m.answer("اكتب اسم العرض:")
+    await m.answer("ممتاز 👌 خلينا نبدأ بسرعة.\nاكتب اسم العرض (مثال: متجر سامر):", reply_markup=ReplyKeyboardRemove())
 
 
 @dp.message(CreateWizard.name)
@@ -95,7 +177,7 @@ async def create_name(m: Message, state: FSMContext):
     user, page = me(m)
     upsert_page_field(page["id"], "display_name", sanitize_text(m.text or "", 60))
     await state.set_state(CreateWizard.bio)
-    await m.answer("اكتب نبذة قصيرة:")
+    await m.answer("اكتب نبذة قصيرة (سطر واحد يكفي):")
 
 
 @dp.message(CreateWizard.bio)
@@ -103,13 +185,21 @@ async def create_bio(m: Message, state: FSMContext):
     user, page = me(m)
     upsert_page_field(page["id"], "bio", sanitize_text(m.text or "", 200))
     await state.set_state(CreateWizard.avatar)
-    await m.answer("أرسل صورة (Avatar) أو اكتب /skip")
+    await m.answer("إذا بدك صورة بعتلي صورة هلأ، أو اختار تخطي 👇", reply_markup=quick_choice_kb(["تخطي"]))
 
 
 @dp.message(CreateWizard.avatar, Command("skip"))
 async def create_avatar_skip(m: Message, state: FSMContext):
     await state.set_state(CreateWizard.links)
-    await m.answer("أرسل الروابط بهذا الشكل:\nالعنوان | الرابط\nأرسل /done عند الانتهاء")
+    await m.answer("ابعث روابطك بسهولة 👇\n- فيك تبعت الرابط لحاله (مثال: https://instagram.com/username)\n- أو: العنوان | الرابط\nلما تخلص اكتب: تم", reply_markup=quick_choice_kb(["تم"]))
+
+
+@dp.message(CreateWizard.avatar, F.text)
+async def create_avatar_skip_text(m: Message, state: FSMContext):
+    if is_skip_text(m.text or ""):
+        await create_avatar_skip(m, state)
+        return
+    await m.answer("إما أرسل صورة، أو اضغط تخطي")
 
 
 @dp.message(CreateWizard.avatar, F.photo)
@@ -121,42 +211,75 @@ async def create_avatar_photo(m: Message, state: FSMContext):
     await bot.download_file(file.file_path, destination=path)
     upsert_page_field(page["id"], "avatar_path", f"/uploads/{path.name}")
     await state.set_state(CreateWizard.links)
-    await m.answer("تم حفظ الصورة. الآن أرسل الروابط (العنوان | الرابط) ثم /done")
+    await m.answer("تم حفظ الصورة ✅\nالآن ابعث روابطك (رابط فقط أو العنوان | الرابط)\nولما تخلص اكتب: تم", reply_markup=quick_choice_kb(["تم"]))
 
 
 @dp.message(CreateWizard.links, Command("done"))
 async def create_links_done(m: Message, state: FSMContext):
     await state.set_state(CreateWizard.offer)
-    await m.answer("أرسل عرض اليوم بهذا الشكل: العنوان | الرابط أو /skip")
+    await m.answer("بدك تضيف عرض اليوم؟\nالصيغة: العنوان | الرابط\nأو اختار تخطي", reply_markup=quick_choice_kb(["تخطي"]))
 
 
 @dp.message(CreateWizard.links)
 async def create_links_add(m: Message, state: FSMContext):
+    text = (m.text or "").strip()
+    if is_done_text(text):
+        await create_links_done(m, state)
+        return
+
     user, page = me(m)
     limits = plan_limits(user)
     links = list_links(page["id"])
     if len(links) >= limits["max_links"]:
-        await m.answer("وصلت للحد الأقصى لعدد الروابط في خطتك الحالية.")
+        await m.answer("وصلت للحد الأقصى لعدد الروابط في خطتك الحالية. اكتب تم للمتابعة.")
         return
-    if "|" not in (m.text or ""):
-        await m.answer("صيغة غير صحيحة. استخدم: العنوان | الرابط")
+
+    # support multi-line paste for easier onboarding
+    lines = [x.strip() for x in text.splitlines() if x.strip()]
+    if not lines:
+        await m.answer("ابعث رابط واحد أو أكثر، وكل رابط بسطر")
         return
-    title, url = [x.strip() for x in m.text.split("|", 1)]
-    if not valid_http_url(url):
-        await m.answer("الرابط غير صالح. استخدم http:// أو https:// فقط")
+
+    added = 0
+    for line in lines:
+        if added + len(links) >= limits["max_links"]:
+            break
+        if "|" in line:
+            title, url = [x.strip() for x in line.split("|", 1)]
+        else:
+            url = line
+            title, _platform = infer_title_from_url(url)
+
+        if not valid_http_url(url):
+            continue
+        try:
+            add_link(page["id"], title, url)
+            added += 1
+        except ValueError:
+            continue
+
+    if added == 0:
+        await m.answer("ما قدرت أضيف روابط من الرسالة. تأكد كل رابط يبدأ بـ http:// أو https://")
         return
-    try:
-        add_link(page["id"], title, url)
-    except ValueError:
-        await m.answer("الرابط غير صالح")
-        return
-    await m.answer("تمت إضافة الرابط ✅")
+
+    await m.answer(f"تمت إضافة {added} رابط ✅\nابعث روابط زيادة أو اكتب: تم")
 
 
 @dp.message(CreateWizard.offer, Command("skip"))
 async def create_offer_skip(m: Message, state: FSMContext):
     await state.clear()
-    await m.answer("تم حفظ الصفحة. نفّذ /publish للنشر.")
+    await m.answer("تم حفظ الصفحة ✅\nالآن اضغط 📤 نشر", reply_markup=main_menu_kb())
+
+
+@dp.message(CreateWizard.offer, F.text)
+async def create_offer_skip_text(m: Message, state: FSMContext):
+    if is_skip_text(m.text or ""):
+        await create_offer_skip(m, state)
+        return
+    if "|" not in (m.text or ""):
+        await m.answer("اكتب العرض هكذا: العنوان | الرابط أو اضغط تخطي")
+        return
+    await create_offer_set(m, state)
 
 
 @dp.message(CreateWizard.offer)
@@ -172,7 +295,7 @@ async def create_offer_set(m: Message, state: FSMContext):
     upsert_page_field(page["id"], "offer_title", sanitize_text(title, 80))
     upsert_page_field(page["id"], "offer_url", url)
     await state.clear()
-    await m.answer("تم حفظ العرض ✅ نفّذ /publish للنشر")
+    await m.answer("تم حفظ العرض ✅\nالآن اضغط 📤 نشر", reply_markup=main_menu_kb())
 
 
 @dp.message(Command("publish"))
@@ -184,7 +307,7 @@ async def publish_cmd(m: Message):
     slug = page["slug"] or generate_unique_slug(page["display_name"])
     with get_conn() as conn:
         conn.execute("UPDATE pages SET slug=?, is_published=1, updated_at=datetime('now') WHERE id=?", (slug, page["id"]))
-    await m.answer(f"تم النشر ✅\n{BASE_URL}/u/{slug}")
+    await m.answer(f"تم النشر ✅\n{BASE_URL}/u/{slug}", reply_markup=main_menu_kb())
 
 
 @dp.message(Command("links"))
@@ -196,21 +319,26 @@ async def links_cmd(m: Message, state: FSMContext):
         text += "(لا يوجد)\n"
     for i, l in enumerate(links, start=1):
         text += f"{i}) {l['title']} -> {l['url']}\n"
-    text += "\nللإضافة: add العنوان | الرابط\nللحذف: remove رقم\nلإعادة الترتيب (مدفوع): move من إلى\nللخروج: /done"
+    text += "\nللإضافة السريعة: ابعث رابط مباشرة\nأو add العنوان | الرابط\nللحذف: remove رقم\nللترتيب (مدفوع): move من إلى\nللخروج: تم"
     await state.set_state(LinksWizard.menu)
-    await m.answer(text)
+    await m.answer(text, reply_markup=quick_choice_kb(["تم"]))
 
 
 @dp.message(LinksWizard.menu, Command("done"))
 async def links_done(m: Message, state: FSMContext):
     await state.clear()
-    await m.answer("تم")
+    await m.answer("تم ✅", reply_markup=main_menu_kb())
 
 
 @dp.message(LinksWizard.menu)
-async def links_actions(m: Message):
+async def links_actions(m: Message, state: FSMContext):
     user, page = me(m)
     txt = (m.text or "").strip()
+
+    if is_done_text(txt):
+        await links_done(m, state)
+        return
+
     if txt.startswith("add "):
         body = txt[4:]
         if "|" not in body:
@@ -218,7 +346,7 @@ async def links_actions(m: Message):
             return
         limits = plan_limits(user)
         if len(list_links(page["id"])) >= limits["max_links"]:
-            await m.answer("لا يمكن إضافة أكثر من 3 روابط في الخطة المجانية.")
+            await m.answer("وصلت لحد الروابط في خطتك.")
             return
         t, u = [x.strip() for x in body.split("|", 1)]
         if not valid_http_url(u):
@@ -231,6 +359,7 @@ async def links_actions(m: Message):
             return
         await m.answer("تمت الإضافة ✅")
         return
+
     if txt.startswith("remove "):
         try:
             idx = int(txt.split()[1])
@@ -240,6 +369,7 @@ async def links_actions(m: Message):
         ok = remove_link(page["id"], idx)
         await m.answer("تم الحذف ✅" if ok else "رقم غير صحيح")
         return
+
     if txt.startswith("move "):
         limits = plan_limits(user)
         if not limits["reorder"]:
@@ -252,7 +382,22 @@ async def links_actions(m: Message):
         except Exception:
             await m.answer("استخدم: move من إلى")
         return
-    await m.answer("أمر غير معروف. استخدم add/remove/move أو /done")
+
+    # ultra-simple: allow direct URL add
+    if valid_http_url(txt):
+        limits = plan_limits(user)
+        if len(list_links(page["id"])) >= limits["max_links"]:
+            await m.answer("وصلت لحد الروابط في خطتك.")
+            return
+        title, _platform = infer_title_from_url(txt)
+        try:
+            add_link(page["id"], title, txt)
+            await m.answer(f"تمت إضافة الرابط ✅ ({title})")
+        except ValueError:
+            await m.answer("الرابط غير صالح")
+        return
+
+    await m.answer("مو واضح. ابعث رابط مباشر، أو add/remove/move، أو تم")
 
 
 @dp.message(Command("edit"))
