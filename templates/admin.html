@@ -22,7 +22,7 @@
   <div class="grid">
     <div class="card">
       <h2>Create Voucher</h2>
-      <form method="post" action="/admin/voucher/create">
+      <form method="post" action="{{prefix}}/admin/voucher/create">
         <select name="plan_type">
           <option value="PRO_1">PRO_1 ($1)</option>
           <option value="PRO_3">PRO_3 ($3)</option>
@@ -46,7 +46,7 @@
           <td>{{ v.is_active }}</td><td>{{ v.redeemed_by_user_id or '-' }}</td>
           <td>
             {% if v.is_active %}
-            <form method="post" action="/admin/voucher/{{ v.id }}/disable"><button>Disable</button></form>
+            <form method="post" action="{{prefix}}/admin/voucher/{{ v.id }}/disable"><button>Disable</button></form>
             {% endif %}
           </td>
         </tr>

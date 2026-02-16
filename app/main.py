@@ -30,6 +30,13 @@ app.mount("/uploads", StaticFiles(directory=str(Path(UPLOAD_DIR))), name="upload
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 
+def prefix_of(request: Request) -> str:
+    p = (request.headers.get("x-forwarded-prefix") or "").strip()
+    if p.endswith("/"):
+        p = p[:-1]
+    return p
+
+
 def admin_auth(credentials: HTTPBasicCredentials = Depends(security)):
     ok_user = secrets.compare_digest(credentials.username, ADMIN_USERNAME)
     ok_pass = secrets.compare_digest(credentials.password, ADMIN_PASSWORD)
@@ -50,9 +57,11 @@ def health():
 
 @app.get("/", response_class=HTMLResponse)
 def site_home(request: Request, lang: str = "ar"):
+    prefix = prefix_of(request)
     return templates.TemplateResponse("site_home.html", {
         "request": request,
         "lang": lang,
+        "prefix": prefix,
         "bot_link": f"https://t.me/{BOT_USERNAME}",
         "support_telegram": SUPPORT_TELEGRAM,
     })
@@ -60,9 +69,11 @@ def site_home(request: Request, lang: str = "ar"):
 
 @app.get("/pricing", response_class=HTMLResponse)
 def site_pricing(request: Request, lang: str = "ar"):
+    prefix = prefix_of(request)
     return templates.TemplateResponse("site_pricing.html", {
         "request": request,
         "lang": lang,
+        "prefix": prefix,
         "payment_text": PAYMENT_METHODS_TEXT,
         "bot_link": f"https://t.me/{BOT_USERNAME}",
     })
@@ -70,12 +81,12 @@ def site_pricing(request: Request, lang: str = "ar"):
 
 @app.get("/examples", response_class=HTMLResponse)
 def site_examples(request: Request, lang: str = "ar"):
-    return templates.TemplateResponse("site_examples.html", {"request": request, "lang": lang})
+    return templates.TemplateResponse("site_examples.html", {"request": request, "lang": lang, "prefix": prefix_of(request)})
 
 
 @app.get("/faq", response_class=HTMLResponse)
 def site_faq(request: Request, lang: str = "ar"):
-    return templates.TemplateResponse("site_faq.html", {"request": request, "lang": lang})
+    return templates.TemplateResponse("site_faq.html", {"request": request, "lang": lang, "prefix": prefix_of(request)})
 
 
 @app.get("/contact", response_class=HTMLResponse)
@@ -83,6 +94,7 @@ def site_contact(request: Request, lang: str = "ar"):
     return templates.TemplateResponse("site_contact.html", {
         "request": request,
         "lang": lang,
+        "prefix": prefix_of(request),
         "support_telegram": SUPPORT_TELEGRAM,
         "business_email": BUSINESS_EMAIL,
     })
@@ -91,6 +103,7 @@ def site_contact(request: Request, lang: str = "ar"):
 @app.get("/u/{slug}", response_class=HTMLResponse)
 def public_page(slug: str, request: Request):
     ip = request.client.host if request.client else "unknown"
+    prefix = prefix_of(request)
     if not check_rate_limit(f"u:{ip}", limit=180, period_sec=60):
         raise HTTPException(status_code=429, detail="Too many requests")
 
@@ -112,6 +125,7 @@ def public_page(slug: str, request: Request):
             "page": page,
             "links": links,
             "show_watermark": show_watermark,
+            "prefix": prefix,
         },
     )
 
@@ -137,6 +151,7 @@ def redirect_link(link_id: int, request: Request):
 
 @app.get("/admin", response_class=HTMLResponse)
 def admin_dashboard(request: Request, _: bool = Depends(admin_auth)):
+    prefix = prefix_of(request)
     with get_conn() as conn:
         users = conn.execute("SELECT * FROM users ORDER BY id DESC LIMIT 100").fetchall()
         pages = conn.execute("SELECT * FROM pages ORDER BY id DESC LIMIT 100").fetchall()
@@ -147,6 +162,7 @@ def admin_dashboard(request: Request, _: bool = Depends(admin_auth)):
         "admin.html",
         {
             "request": request,
+            "prefix": prefix,
             "users": users,
             "pages": pages,
             "vouchers": vouchers,
@@ -158,6 +174,7 @@ def admin_dashboard(request: Request, _: bool = Depends(admin_auth)):
 
 @app.post("/admin/voucher/create")
 def admin_voucher_create(
+    request: Request,
     plan_type: str = Form(...),
     duration_days: int = Form(...),
     _: bool = Depends(admin_auth),
@@ -172,11 +189,13 @@ def admin_voucher_create(
             "INSERT INTO vouchers (code, plan_type, duration_days, created_at) VALUES (?, ?, ?, datetime('now'))",
             (code, plan_type, duration_days),
         )
-    return RedirectResponse(url="/admin", status_code=303)
+    prefix = prefix_of(request)
+    return RedirectResponse(url=f"{prefix}/admin" if prefix else "/admin", status_code=303)
 
 
 @app.post("/admin/voucher/{voucher_id}/disable")
-def admin_voucher_disable(voucher_id: int, _: bool = Depends(admin_auth)):
+def admin_voucher_disable(request: Request, voucher_id: int, _: bool = Depends(admin_auth)):
     with get_conn() as conn:
         conn.execute("UPDATE vouchers SET is_active=0 WHERE id=?", (voucher_id,))
-    return RedirectResponse(url="/admin", status_code=303)
+    prefix = prefix_of(request)
+    return RedirectResponse(url=f"{prefix}/admin" if prefix else "/admin", status_code=303)
