@@ -20,7 +20,7 @@
 <body>
 <div class="wrap">
   <div class="card">
-    {% if page.avatar_path %}<img class="avatar" src="{{ prefix }}{{ page.avatar_path }}" alt="avatar" />{% endif %}
+    {% if page.avatar_path %}<img class="avatar" src="{{ prefix }}{{ page.avatar_path }}?v={{ page.updated_at }}" alt="avatar" />{% endif %}
     <h1>{{ page.display_name or 'Linkat User' }}</h1>
     <p class="bio">{{ page.bio or '' }}</p>
 
