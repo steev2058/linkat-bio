@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ page.display_name or app_name }}</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#f8fafc;margin:0;padding:0;color:#0f172a}
+    .wrap{max-width:430px;margin:0 auto;padding:20px}
+    .card{background:white;border-radius:16px;padding:20px;box-shadow:0 8px 24px rgba(0,0,0,.06)}
+    .avatar{width:96px;height:96px;border-radius:50%;object-fit:cover;display:block;margin:0 auto 12px;border:3px solid #e2e8f0}
+    h1{text-align:center;margin:6px 0 8px;font-size:24px}
+    p.bio{text-align:center;color:#475569;margin:0 0 14px}
+    .offer{background:#fef3c7;padding:10px;border-radius:10px;margin:12px 0;font-size:14px}
+    .btn{display:block;text-decoration:none;background:{{ page.theme_color or '#0f172a' }};color:white;padding:12px;border-radius:12px;text-align:center;margin:8px 0;font-weight:700}
+    .watermark{text-align:center;color:#64748b;font-size:13px;margin-top:16px}
+    iframe{width:100%;height:220px;border:0;border-radius:12px;margin-top:10px}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    {% if page.avatar_path %}<img class="avatar" src="{{ page.avatar_path }}" alt="avatar" />{% endif %}
+    <h1>{{ page.display_name or 'Linkat User' }}</h1>
+    <p class="bio">{{ page.bio or '' }}</p>
+
+    {% if page.offer_title and page.offer_url %}
+      <div class="offer">🔥 عرض اليوم: <a href="{{ page.offer_url }}" target="_blank">{{ page.offer_title }}</a></div>
+    {% endif %}
+
+    {% for link in links %}
+      <a class="btn" href="/r/{{ link.id }}">{{ link.title }}</a>
+    {% endfor %}
+
+    {% if page.featured_video_url %}
+      <iframe src="{{ page.featured_video_url }}" allowfullscreen></iframe>
+    {% endif %}
+
+    {% if show_watermark %}<div class="watermark">Made with Linkat</div>{% endif %}
+  </div>
+</div>
+</body>
+</html>
