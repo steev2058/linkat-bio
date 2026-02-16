@@ -1,0 +1,12 @@
+{% extends 'site_base.html' %}
+{% block content %}
+<h1>{{ 'الأسعار' if lang!='en' else 'Pricing' }}</h1>
+<div class="cards">
+  <div class="card"><h3>Free</h3><p>3 links + watermark</p></div>
+  <div class="card"><h3>$1 / month</h3><p>Unlimited links + no watermark + reorder + theme</p></div>
+  <div class="card"><h3>$3 / month</h3><p>Subdomain + featured video + analytics</p></div>
+</div>
+<h2>{{ 'طرق الدفع للحصول على كود التفعيل' if lang!='en' else 'Payment methods for activation code' }}</h2>
+<pre class="pay">{{ payment_text }}</pre>
+<a class="btn" href="{{bot_link}}">{{ 'ابدأ الآن' if lang!='en' else 'Start now' }}</a>
+{% endblock %}

@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from slugify import slugify
 
 from app.db import get_conn, utcnow
+from app.security import valid_http_url, sanitize_text
 
 
 def gen_code(n=10):
@@ -31,11 +32,15 @@ def upsert_page_field(page_id: int, field: str, value):
 
 
 def add_link(page_id: int, title: str, url: str, platform: str = "custom"):
+    if not valid_http_url(url):
+        raise ValueError("invalid_url")
+    safe_title = sanitize_text(title, 80)
+    safe_url = (url or "").strip()
     with get_conn() as conn:
         max_pos = conn.execute("SELECT COALESCE(MAX(position),0) AS m FROM links WHERE page_id=?", (page_id,)).fetchone()["m"]
         conn.execute(
             "INSERT INTO links (page_id, title, url, platform, position, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (page_id, title, url, platform, max_pos + 1, utcnow()),
+            (page_id, safe_title, safe_url, platform, max_pos + 1, utcnow()),
         )
 
 

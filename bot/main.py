@@ -7,10 +7,12 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message
 from dotenv import load_dotenv
 import os
+import re
 
-from app.config import WELCOME_TEXT, PAYMENT_METHODS_TEXT, BASE_URL, OPENAI_API_KEY
+from app.config import WELCOME_TEXT, PAYMENT_METHODS_TEXT, BASE_URL, OPENAI_API_KEY, UPLOAD_DIR
 from openai import OpenAI
 from app.db import init_db, ensure_user, ensure_page, redeem_voucher_for_user, get_conn
+from app.security import sanitize_text, valid_http_url
 from app.services import (
     add_link,
     list_links,
@@ -24,7 +26,7 @@ from app.services import (
 
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-UPLOAD_DIR = Path(__file__).resolve().parent.parent / "static" / "uploads"
+UPLOAD_DIR = Path(UPLOAD_DIR)
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 bot = Bot(token=TOKEN)
@@ -91,7 +93,7 @@ async def create_start(m: Message, state: FSMContext):
 @dp.message(CreateWizard.name)
 async def create_name(m: Message, state: FSMContext):
     user, page = me(m)
-    upsert_page_field(page["id"], "display_name", m.text.strip())
+    upsert_page_field(page["id"], "display_name", sanitize_text(m.text or "", 60))
     await state.set_state(CreateWizard.bio)
     await m.answer("اكتب نبذة قصيرة:")
 
@@ -99,7 +101,7 @@ async def create_name(m: Message, state: FSMContext):
 @dp.message(CreateWizard.bio)
 async def create_bio(m: Message, state: FSMContext):
     user, page = me(m)
-    upsert_page_field(page["id"], "bio", m.text.strip())
+    upsert_page_field(page["id"], "bio", sanitize_text(m.text or "", 200))
     await state.set_state(CreateWizard.avatar)
     await m.answer("أرسل صورة (Avatar) أو اكتب /skip")
 
@@ -115,9 +117,9 @@ async def create_avatar_photo(m: Message, state: FSMContext):
     user, page = me(m)
     photo = m.photo[-1]
     file = await bot.get_file(photo.file_id)
-    path = UPLOAD_DIR / f"avatar_{user['id']}.jpg"
+    path = UPLOAD_DIR / f"avatar_{user['id']}_{photo.file_id[-8:]}.jpg"
     await bot.download_file(file.file_path, destination=path)
-    upsert_page_field(page["id"], "avatar_path", f"/static/uploads/{path.name}")
+    upsert_page_field(page["id"], "avatar_path", f"/uploads/{path.name}")
     await state.set_state(CreateWizard.links)
     await m.answer("تم حفظ الصورة. الآن أرسل الروابط (العنوان | الرابط) ثم /done")
 
@@ -140,7 +142,14 @@ async def create_links_add(m: Message, state: FSMContext):
         await m.answer("صيغة غير صحيحة. استخدم: العنوان | الرابط")
         return
     title, url = [x.strip() for x in m.text.split("|", 1)]
-    add_link(page["id"], title, url)
+    if not valid_http_url(url):
+        await m.answer("الرابط غير صالح. استخدم http:// أو https:// فقط")
+        return
+    try:
+        add_link(page["id"], title, url)
+    except ValueError:
+        await m.answer("الرابط غير صالح")
+        return
     await m.answer("تمت إضافة الرابط ✅")
 
 
@@ -157,7 +166,10 @@ async def create_offer_set(m: Message, state: FSMContext):
         await m.answer("الصيغة: العنوان | الرابط")
         return
     title, url = [x.strip() for x in m.text.split("|", 1)]
-    upsert_page_field(page["id"], "offer_title", title)
+    if not valid_http_url(url):
+        await m.answer("رابط العرض غير صالح")
+        return
+    upsert_page_field(page["id"], "offer_title", sanitize_text(title, 80))
     upsert_page_field(page["id"], "offer_url", url)
     await state.clear()
     await m.answer("تم حفظ العرض ✅ نفّذ /publish للنشر")
@@ -209,7 +221,14 @@ async def links_actions(m: Message):
             await m.answer("لا يمكن إضافة أكثر من 3 روابط في الخطة المجانية.")
             return
         t, u = [x.strip() for x in body.split("|", 1)]
-        add_link(page["id"], t, u)
+        if not valid_http_url(u):
+            await m.answer("الرابط غير صالح. استخدم http/https")
+            return
+        try:
+            add_link(page["id"], t, u)
+        except ValueError:
+            await m.answer("الرابط غير صالح")
+            return
         await m.answer("تمت الإضافة ✅")
         return
     if txt.startswith("remove "):
@@ -254,7 +273,7 @@ async def set_name(m: Message, command: CommandObject):
     if not command.args:
         await m.answer("استخدم: /setname الاسم")
         return
-    upsert_page_field(page["id"], "display_name", command.args.strip())
+    upsert_page_field(page["id"], "display_name", sanitize_text(command.args, 60))
     await m.answer("تم تحديث الاسم")
 
 
@@ -264,7 +283,7 @@ async def set_bio(m: Message, command: CommandObject):
     if not command.args:
         await m.answer("استخدم: /setbio النبذة")
         return
-    upsert_page_field(page["id"], "bio", command.args.strip())
+    upsert_page_field(page["id"], "bio", sanitize_text(command.args, 200))
     await m.answer("تم تحديث النبذة")
 
 
@@ -278,7 +297,11 @@ async def set_theme(m: Message, command: CommandObject):
     if not command.args:
         await m.answer("استخدم: /settheme #112233")
         return
-    upsert_page_field(page["id"], "theme_color", command.args.strip())
+    color = command.args.strip()
+    if not re.match(r"^#[0-9a-fA-F]{6}$", color):
+        await m.answer("صيغة اللون يجب أن تكون مثل #112233")
+        return
+    upsert_page_field(page["id"], "theme_color", color)
     await m.answer("تم تحديث اللون")
 
 
@@ -292,7 +315,11 @@ async def set_video(m: Message, command: CommandObject):
     if not command.args:
         await m.answer("استخدم: /setvideo الرابط")
         return
-    upsert_page_field(page["id"], "featured_video_url", command.args.strip())
+    url = command.args.strip()
+    if not valid_http_url(url):
+        await m.answer("رابط الفيديو غير صالح")
+        return
+    upsert_page_field(page["id"], "featured_video_url", url)
     await m.answer("تم تحديث الفيديو")
 
 
@@ -303,7 +330,10 @@ async def set_offer(m: Message, command: CommandObject):
         await m.answer("استخدم: /setoffer العنوان | الرابط")
         return
     t, u = [x.strip() for x in command.args.split("|", 1)]
-    upsert_page_field(page["id"], "offer_title", t)
+    if not valid_http_url(u):
+        await m.answer("رابط العرض غير صالح")
+        return
+    upsert_page_field(page["id"], "offer_title", sanitize_text(t, 80))
     upsert_page_field(page["id"], "offer_url", u)
     await m.answer("تم تحديث عرض اليوم")
 

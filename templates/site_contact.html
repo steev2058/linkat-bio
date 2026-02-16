@@ -1,0 +1,8 @@
+{% extends 'site_base.html' %}
+{% block content %}
+<h1>{{ 'تواصل معنا' if lang!='en' else 'Contact us' }}</h1>
+<div class="card">
+  <p>Email: <a href="mailto:{{business_email}}">{{business_email}}</a></p>
+  <p>Telegram: <a href="{{support_telegram}}">{{support_telegram}}</a></p>
+</div>
+{% endblock %}

@@ -1,0 +1,35 @@
+{% extends 'site_base.html' %}
+{% block content %}
+<section class="hero">
+  <h1>{{ 'رابط واحد لكل حساباتك' if lang!='en' else 'One link for all your accounts' }}</h1>
+  <p>{{ 'أنشئ صفحتك خلال دقيقة وشاركها مع جمهورك.' if lang!='en' else 'Create your page in one minute and share it everywhere.' }}</p>
+  <div class="cta-row">
+    <a class="btn" href="{{bot_link}}">{{ 'ابدأ عبر تلغرام' if lang!='en' else 'Start on Telegram' }}</a>
+    <a class="btn btn-outline" href="/examples?lang={{lang}}">{{ 'شاهد أمثلة' if lang!='en' else 'View examples' }}</a>
+  </div>
+</section>
+<section>
+  <h2>{{ 'مناسب لـ' if lang!='en' else 'Best for' }}</h2>
+  <div class="cards">
+    <div class="card">{{ 'صانع محتوى' if lang!='en' else 'Creator' }}</div>
+    <div class="card">{{ 'متجر' if lang!='en' else 'Store' }}</div>
+    <div class="card">{{ 'خدمات' if lang!='en' else 'Services' }}</div>
+  </div>
+</section>
+<section>
+  <h2>{{ 'كيف يعمل' if lang!='en' else 'How it works' }}</h2>
+  <ol>
+    <li>{{ 'افتح البوت' if lang!='en' else 'Open the bot' }}</li>
+    <li>{{ 'أضف روابطك' if lang!='en' else 'Add your links' }}</li>
+    <li>{{ 'شارك صفحتك' if lang!='en' else 'Share your page' }}</li>
+  </ol>
+</section>
+<section>
+  <h2>{{ 'الشبكات المدعومة' if lang!='en' else 'Supported platforms' }}</h2>
+  <p>YouTube • Instagram • TikTok • Snapchat • Facebook • WhatsApp • Telegram</p>
+</section>
+<section>
+  <h2>{{ 'آراء العملاء' if lang!='en' else 'Testimonials' }}</h2>
+  <div class="cards"><div class="card">{{ 'خدمة ممتازة وسريعة 👌' if lang!='en' else 'Super useful and fast 👌' }}</div><div class="card">{{ 'رتّبت كل حساباتي برابط واحد' if lang!='en' else 'All my links in one page' }}</div></div>
+</section>
+{% endblock %}

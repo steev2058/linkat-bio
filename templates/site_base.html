@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="{{ 'ar' if lang!='en' else 'en' }}" dir="{{ 'rtl' if lang!='en' else 'ltr' }}">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Linkat</title>
+  <link rel="stylesheet" href="/static/site.css" />
+</head>
+<body>
+  <header class="top">
+    <a class="logo" href="/?lang={{lang}}">Linkat</a>
+    <nav>
+      <a href="/?lang={{lang}}">{{ 'الرئيسية' if lang!='en' else 'Home' }}</a>
+      <a href="/pricing?lang={{lang}}">{{ 'الأسعار' if lang!='en' else 'Pricing' }}</a>
+      <a href="/examples?lang={{lang}}">{{ 'أمثلة' if lang!='en' else 'Examples' }}</a>
+      <a href="/faq?lang={{lang}}">FAQ</a>
+      <a href="/contact?lang={{lang}}">{{ 'تواصل' if lang!='en' else 'Contact' }}</a>
+      <a class="lang" href="{{request.url.path}}?lang={{ 'en' if lang!='en' else 'ar' }}">{{ 'EN' if lang!='en' else 'AR' }}</a>
+    </nav>
+  </header>
+  <main class="container">{% block content %}{% endblock %}</main>
+  <footer class="foot">© Linkat</footer>
+</body>
+</html>

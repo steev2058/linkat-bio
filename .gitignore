@@ -2,6 +2,8 @@ __pycache__/
 *.pyc
 .venv/
 .env
+*.db
 linkat.db
-static/uploads/*
-!static/uploads/.gitkeep
+data/uploads/*
+!data/uploads/.gitkeep
+/var/www/linkat/uploads/*

@@ -1,18 +1,30 @@
 # Linkat 🔗
 
-Arabic-first Telegram bot + FastAPI web app for link-in-bio pages.
+Telegram bot + FastAPI app (Arabic-first) for link-in-bio pages, Syria-first.
 
-## Product
+## Features
 - Public page: `https://pety.company/u/<slug>`
-- Redirect tracker: `https://pety.company/r/<link_id>`
-- Admin panel: `https://pety.company/admin` (HTTP Basic)
-- Health: `GET /api/health -> {"status":"ok"}`
+- Redirect tracking: `/r/<link_id>`
+- Telegram wizard to create/edit/publish page
+- Plans: FREE / PRO_1 / PRO_3 via voucher codes
+- Analytics: views/clicks + top links + 7-day stats
+- Admin panel: `/admin` (basic auth via env)
+- Marketing website pages:
+  - `/` Home
+  - `/pricing`
+  - `/examples`
+  - `/faq`
+  - `/contact`
 
-## Stack
-- Bot: aiogram (FSM)
-- Backend: FastAPI + Uvicorn
-- Templates: Jinja2
-- DB: SQLite (migration-ready for Postgres later)
+## Required security rules implemented
+- URL validation: only `http/https`
+- Block `javascript:` and `data:`
+- Input sanitization for text fields
+- Safe redirect validation in `/r/*`
+- Basic in-memory rate limiting on `/u/*` and `/r/*`
+- Upload path by env:
+  - Dev/Replit: `./data/uploads`
+  - VPS: `/var/www/linkat/uploads`
 
 ## One-command local run (Replit-friendly)
 ```bash
@@ -20,118 +32,34 @@ make install && make dev
 ```
 
 ## Environment
-Copy `.env.example` to `.env` and update:
+Copy `.env.example` to `.env` and set:
 - `TELEGRAM_BOT_TOKEN`
+- `BOT_USERNAME`
 - `ADMIN_USERNAME`, `ADMIN_PASSWORD`
-- `BASE_URL` (for production: `https://pety.company`)
+- `BASE_URL`
+- `DB_PATH`
+- `UPLOAD_DIR`
+- `OPENAI_API_KEY` (optional)
 
-## Telegram commands
-- `/start` welcome
-- `/create` wizard (name, bio, avatar optional, links, offer)
-- `/edit` field edits
-- `/links` add/remove/reorder
-- `/publish` publish page
-- `/stats` analytics summary
-- `/plan` current plan + payment methods text
-- `/redeem <CODE>` redeem voucher
-- `/post` social text (MVP fallback)
-- `/bio` 5 professional bio options
-- `/lang` ar/en
+## Commands (bot)
+`/start /create /edit /links /publish /stats /plan /redeem /post /bio /lang`
 
-## Plans
-- FREE: 3 links, watermark
-- PRO_1: unlimited links, no watermark, reorder, custom theme
-- PRO_3: PRO_1 + featured video + advanced analytics basis
-
-## Admin panel
-- Create voucher codes: plan type + duration (30/90/365)
-- Disable voucher
-- List users/pages
-- Stats overview (views/clicks)
-
-## Deployment (Hostinger Ubuntu + Nginx + SSL + systemd)
-
-### 1) Clone and setup
+## Tests
 ```bash
-cd /opt
-git clone https://github.com/steev2058/linkat-bio.git
-cd linkat-bio
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-# edit .env
+pytest -q
 ```
 
-### 2) systemd services
-Create `/etc/systemd/system/linkat-web.service`:
-```ini
-[Unit]
-Description=Linkat FastAPI
-After=network.target
-
-[Service]
-User=root
-WorkingDirectory=/opt/linkat-bio
-EnvironmentFile=/opt/linkat-bio/.env
-ExecStart=/opt/linkat-bio/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8090
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Create `/etc/systemd/system/linkat-bot.service`:
-```ini
-[Unit]
-Description=Linkat Telegram Bot
-After=network.target
-
-[Service]
-User=root
-WorkingDirectory=/opt/linkat-bio
-EnvironmentFile=/opt/linkat-bio/.env
-ExecStart=/opt/linkat-bio/.venv/bin/python -m bot.main
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Enable:
+## Seed sample data
 ```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now linkat-web linkat-bot
+python -m scripts.seed_sample
 ```
 
-### 3) Nginx vhost (`/etc/nginx/sites-available/pety.company`)
-```nginx
-server {
-    server_name pety.company;
+## VPS deploy docs
+- `docs/VPS_DEPLOY.md`
+- `docs/HARDENING_CHECKLIST.md`
 
-    location / {
-        proxy_pass http://127.0.0.1:8090;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
-
-Enable and reload:
+## Quick deployment script
 ```bash
-sudo ln -s /etc/nginx/sites-available/pety.company /etc/nginx/sites-enabled/pety.company
-sudo nginx -t && sudo systemctl reload nginx
+bash scripts/install_vps.sh
+REPO_URL=https://github.com/steev2058/linkat-bio.git APP_DIR=/opt/pety-bio DOMAIN=pety.company bash scripts/deploy_vps.sh
 ```
-
-### 4) SSL with certbot
-```bash
-sudo apt-get update
-sudo apt-get install -y certbot python3-certbot-nginx
-sudo certbot --nginx -d pety.company
-```
-
-## Migration note (SQLite -> Postgres)
-Schema already normalized (`users`, `pages`, `links`, `vouchers`, `analytics_events`).
-For scale, swap sqlite access layer with SQLAlchemy and Postgres DSN.

@@ -1,0 +1,7 @@
+{% extends 'site_base.html' %}
+{% block content %}
+<h1>FAQ</h1>
+<div class="card"><strong>{{ 'هل الخدمة مجانية؟' if lang!='en' else 'Is it free?' }}</strong><p>{{ 'نعم، مع 3 روابط وعلامة مائية.' if lang!='en' else 'Yes, with 3 links and watermark.' }}</p></div>
+<div class="card"><strong>{{ 'كيف أفعّل الباقة؟' if lang!='en' else 'How to upgrade?' }}</strong><p>{{ 'استخدم /redeem CODE داخل البوت.' if lang!='en' else 'Use /redeem CODE in Telegram bot.' }}</p></div>
+<div class="card"><strong>{{ 'هل تدعم سوريا؟' if lang!='en' else 'Syria support?' }}</strong><p>{{ 'نعم، طرق دفع مناسبة للسوق المحلي.' if lang!='en' else 'Yes, with local-friendly payment methods.' }}</p></div>
+{% endblock %}

@@ -11,3 +11,9 @@ web:
 
 bot:
 	$(PY) -m bot.main
+
+test:
+	$(PY) -m pytest -q
+
+seed:
+	$(PY) -m scripts.seed_sample

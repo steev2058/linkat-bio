@@ -1,0 +1,9 @@
+{% extends 'site_base.html' %}
+{% block content %}
+<h1>{{ 'أمثلة صفحات' if lang!='en' else 'Examples Gallery' }}</h1>
+<div class="cards">
+  {% for i in range(1,7) %}
+    <div class="card"><strong>{{ 'مثال' if lang!='en' else 'Example' }} {{i}}</strong><p>@creator{{i}}</p><a href="#">pety.company/u/example{{i}}</a></div>
+  {% endfor %}
+</div>
+{% endblock %}
